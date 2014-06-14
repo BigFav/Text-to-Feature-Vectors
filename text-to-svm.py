@@ -95,3 +95,6 @@ def main():
     ft_vecs = ''.join(ft_vecs)
     with open('svm_test.test', 'w') as test:
        test.write(ft_vecs)
+ 
+if __name__ == '__main__':
+    main()
