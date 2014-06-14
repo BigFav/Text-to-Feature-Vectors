@@ -1,106 +1,97 @@
+from __future__ import unicode_literals
 import re
+import sys
 from collections import Counter
 from operator import itemgetter
+from string import punctuation
 
 
-total_words = []
-train_words = []
-train_labels = []
-test_words = []
-
-start_tokens = " </s> <s>"
-
-with open('reviews.train', 'r') as reviews:
-    for i, tokens in enumerate(reviews.readlines()[1:]):
-        tokens = unicode(tokens, errors='replace')
-        train_labels.append(tokens[0])
-        tokens = tokens[4:]
-        tokens = tokens.replace(":)", " \u1F601 ")
-        tokens = tokens.replace(":", " : ")
-        tokens = tokens.replace(")", " ) ")
-        tokens = tokens.replace("(", " ( ")
-        tokens = tokens.replace(";", " ; ")
-        tokens = tokens.replace("\"", " \" ")
-        tokens = re.sub("\.\.+", u" \u2026 ", tokens) #elipsis
-        tokens = tokens.replace(".", " ." + start_tokens)
-        tokens = re.sub("(\!+\?|\?+\!)[?!]*", " \u203D" + start_tokens, tokens)
-        tokens = re.sub("\!\!+"," !!" + start_tokens, tokens)
-        tokens = re.sub("\?\?+"," ??" + start_tokens, tokens)
-        tokens = re.sub("(?<![?!])([?!])", r" \1" + start_tokens, tokens)
-        tokens = re.sub("(?<=[a-zI])('[a-z][a-z]?)\s", r" \1 ", tokens).split()
-
-        tokens = filter(bool, tokens)
-        tokens.insert(0, tokens.pop())
-
-        train_words.append(Counter(tokens))
-
-with open('reviews.test', 'r') as reviews:
-    for i, line in enumerate(reviews.readlines()[1:]):
-        line = unicode(line, errors='replace')
-        line = line[4:]
-        line = line.replace(":)", " \u1F601 ")
-        line = line.replace(")", " ) ")
-        line = line.replace("(", " ( ")
-        line = line.replace(":", " : ")
-        line = line.replace(";", " ; ")
-        line = line.replace("\"", " \" ")
-        line = re.sub("\.\.+", u" \u2026 ", line) #elipsis
-        line = line.replace(".", " ." + start_tokens)
-        line = re.sub("(\!+\?|\?+\!)[?!]*", " \u203D" + start_tokens, line)
-        line = re.sub("\!\!+"," !!" + start_tokens, line)
-        line = re.sub("\?\?+"," ??" + start_tokens, line)
-        line = re.sub("(?<![?!])([?!])", r" \1" + start_tokens, line)
-        line = re.sub("(?<=[a-zI])('[a-z][a-z]?)\s", r" \1 ", line).split()
-
-        line = filter(bool, line)
-        line.insert(0, line.pop())
-
-        test_words.append(Counter(line))
-
-for lst in train_words:
-	for word in lst.iterkeys():
-		total_words.append(word)
-
-for lst in test_words:
-	for word in lst.iterkeys():
-		total_words.append(word)
+punctuation = (punctuation.replace("?", "").replace("'", "").
+                           replace("!", "").replace(".", ""))
 
 
-# Use the index of the word in total_words as value for feature
-with open('svm_train.train', 'w') as train:
-	for i,word_dict in enumerate(train_words):
-		if train_labels[i] == '0':
-			train_labels[i] = '-1'
+def parse_and_tokenize(line):
+    line = line.replace(":)", " \u1F601 ")
+    for ch in punctuation:
+        line = line.replace(ch, ' ' + ch + ' ')
+    line = re.sub("\.\.+", " \u2026 ", line)
+    line = line.replace(".", " . ")
+    line = re.sub("(\!+\?|\?+\!)[?!]*", " \u203D ", line)
+    line = re.sub("\!\!+"," !! ", line)
+    line = re.sub("\?\?+"," ?? ", line)
+    line = re.sub("(?<![?!])([?!])", r" \1 ", line)
+    line = re.sub("(?<=[a-zI])('[a-z][a-z]?)\s", r" \1 ", line).split()
 
-		train.write(train_labels[i])
+    line = filter(bool, line)
+    line.insert(0, line.pop())
+    return line
 
-		ft_lst = []
+def main():
+    train_words = []
+    train_labels = []
+    test_words = []
+    # Read in the files, and add the counts of the words in the line as ft val
+    with open(sys.argv[1], 'r') as reviews:
+        for line in reviews.readlines()[1:]:
+            line = unicode(line, errors='replace')
+            train_labels.append(line[0])
+            line = parse_and_tokenize(line[4:])
+            train_words.append(Counter(line))
 
-		for word,count in word_dict.iteritems():
-			ft_id = total_words.index(word) + 1
-			ft_lst.append((ft_id, (' %s:%s' % (ft_id, count))))
+    with open(sys.argv[2], 'r') as reviews:
+        for line in reviews.readlines()[1:]:
+            line = unicode(line, errors='replace')
+            line = parse_and_tokenize(line[4:])
+            test_words.append(Counter(line))
 
-		ft_lst = sorted(ft_lst, key=itemgetter(0))
+    # The order the word is seen in the dicts will be the ft id
+    total_words = {}
+    i = 0
+    for lst in train_words:
+        for j, word in enumerate(lst.iterkeys()):
+            if word not in total_words:
+                total_words[word] = i + j
+        i += j + 1
 
-		for item in ft_lst:
-			train.write(item[1])
+    for lst in test_words:
+        for j, word in enumerate(lst.iterkeys()):
+            if word not in total_words:
+                total_words[word] = i + j
+        i += j + 1
 
-		train.write('\n')
+    # Create the ft vecs and files
+    ft_vecs = []
+    for i, word_dict in enumerate(train_words):
+        if train_labels[i] == '0':
+            train_labels[i] = '-1'
+        ft_vecs.append(train_labels[i])
 
+        ft_ids = []
+        for word, count in word_dict.iteritems():
+            ft_id = total_words[word] + 1
+            ft_ids.append((ft_id, (' %s:%s' % (ft_id, count))))
+        ft_ids = sorted(ft_ids, key=itemgetter(0))  # Must be in order
 
-with open('svm_test.test', 'w') as test:
-	for word_dict in test_words:
-		test.write('-1')
+        ft_vecs.extend(tup[1] for tup in ft_ids)
+        ft_vecs.append('\n')
 
-		ft_lst = []
+    ft_vecs = ''.join(ft_vecs)
+    with open('svm_train.train', 'w') as train:
+        train.write(ft_vecs)
 
-		for word,count in word_dict.iteritems():
-			ft_id = total_words.index(word) + 1
-			ft_lst.append((ft_id, (' %s:%s' % (ft_id, count))))
+    ft_vecs = []
+    for word_dict in test_words:
+        ft_vecs.append('-1')
 
-		ft_lst = sorted(ft_lst, key=itemgetter(0))
+        ft_ids = []
+        for word, count in word_dict.iteritems():
+            ft_id = total_words[word] + 1
+            ft_ids.append((ft_id, (' %s:%s' % (ft_id, count))))
+        ft_ids = sorted(ft_ids, key=itemgetter(0))
 
-		for item in ft_lst:
-			test.write(item[1])
+        ft_vecs.extend(tup[1] for tup in ft_ids)
+        ft_vecs.append('\n')
 
-		test.write('\n') 
+    ft_vecs = ''.join(ft_vecs)
+    with open('svm_test.test', 'w') as test:
+       test.write(ft_vecs)
