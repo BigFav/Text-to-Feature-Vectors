@@ -19,12 +19,8 @@ def parse_and_tokenize(line):
     line = re.sub("(\!+\?|\?+\!)[?!]*", " \u203D ", line)
     line = re.sub("\!\!+"," !! ", line)
     line = re.sub("\?\?+"," ?? ", line)
-    line = re.sub("(?<![?!])([?!])", r" \1 ", line)
-    line = re.sub("(?<=[a-zI])('[a-z][a-z]?)\s", r" \1 ", line).split()
-
-    line = filter(bool, line)
-    line.insert(0, line.pop())
-    return line
+    line = re.sub("(?<![?!\s])([?!])", r" \1 ", line)
+    return re.sub("(?<=[a-zI])('[a-z][a-z]?)\s", r" \1 ", line).split()
 
 
 def get_feature_vectors(total_words, data_words, data_labels=None):
@@ -55,14 +51,17 @@ def main():
     with open(sys.argv[1], 'r') as reviews:
         for line in reviews.readlines()[1:]:
             line = unicode(line, errors='replace')
-            train_labels.append(line[0])
-            line = parse_and_tokenize(line[4:])
+            # Assumes only one prediction category (e.g. spam, male, etc.)
+            comma = line.find(',')
+            label = line[:comma].strip()
+            train_labels.append(label)
+            line = parse_and_tokenize(line[comma+1:])
             train_words.append(Counter(line))
 
     with open(sys.argv[2], 'r') as reviews:
         for line in reviews.readlines()[1:]:
             line = unicode(line, errors='replace')
-            line = parse_and_tokenize(line[4:])
+            line = parse_and_tokenize(line[line.find(',')+1:])
             test_words.append(Counter(line))
 
     # The order the word is seen in the dicts will be the ft id
@@ -82,11 +81,11 @@ def main():
 
     # Create the ft vecs and files
     ft_vecs = get_feature_vectors(total_words, train_words, train_labels)
-    with open('svm_train1.train', 'w') as train:
+    with open('svm_train.train', 'w') as train:
         train.write(ft_vecs)
 
     ft_vecs = get_feature_vectors(total_words, test_words)
-    with open('svm_test1.test', 'w') as test:
+    with open('svm_test.test', 'w') as test:
        test.write(ft_vecs)
  
 if __name__ == '__main__':
