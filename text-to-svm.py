@@ -47,26 +47,26 @@ def argument_checker():
 def parse_args():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-h", "--help", "-?", action='store_true')
+    parser.add_argument("-m", "-multi", "--multiclass", action='store_true')
     parser.add_argument("-train_set", nargs='+', action=argument_checker())
     parser.add_argument("-val_set", nargs='+', action=argument_checker())
     parser.add_argument("-test_set", nargs='+', action=argument_checker())
-    parser.usage = ("text-to-svm.py [-h] [-train_set input_file [CATEGORY_NUM]"
-                    " [output_file]]\n\t\t[-val_set input_file [CATEGORY_NUM] "
-                    "[output_file]]\n\t\t[-test_set input_file [CATEGORY_NUM] "
-                    "[output_file]]\n\nCATEGORY_NUM refers to one of the "
-                    "potentially multiple classification categories that a "
-                    "line of text may have (e.g. is spam, is male, etc.). It "
-                    "is 1 by default. The default output_file is "
-                    "svm_train.train for an inputted train_set, the others "
-                    "follow this pattern.")
+    parser.usage = ("text-to-svm.py [-h] [-multi] [-train_set input_file "
+                    "[CATEGORY_NUM] [output_file]]\n\t\t[-val_set input_file "
+                    "[CATEGORY_NUM] [output_file]]\n\t\t[-test_set input_file "
+                    "[CATEGORY_NUM] [output_file]]\n\nCATEGORY_NUM refers to "
+                    "one of the potentially multiple classification "
+                    "categories that a line of text may have (e.g. is spam, "
+                    "is male, etc.). It is 1 by default. The default "
+                    "output_file is svm_train.train for an inputted "
+                    "train_set, the others follow this pattern.")
 
     opts = parser.parse_args()
-    num_args = len(sys.argv) - 2 if opts.help else len(sys.argv) - 1
-    if not num_args:
+    if not (opts.train_set or opts.test_set or opts.val_set):
         if opts.help:
             parser.print_usage()
             sys.exit(0)
-        parser.error("No arguments given.")
+        parser.error("Must give at least on data set (train, val, or test).")
     return opts, parser
 
 
@@ -84,13 +84,15 @@ def parse_and_tokenize(line):
     return contractions.sub(r" \1 ", line).split()
 
 
-def get_feature_vectors(total_words, data_words, data_labels):
+def get_feature_vectors(total_words, data_words, data_labels, multiclass):
     ft_vecs = []
     get_items = lambda d: (d.iteritems() if sys.version_info < (3,) else
                            d.items())
     for i, word_dict in enumerate(data_words):
         if not data_labels or (data_labels[i] == '1'):
             ft_vecs.append('1')
+        elif multiclass:
+            ft_vecs.append(data_labels[i])
         else:
             ft_vecs.append('-1')  # Just in case file uses '0' for neg
 
@@ -177,7 +179,8 @@ def main():
                     ft_id += 1
 
         # Create the ft vecs and file
-        ft_vecs = get_feature_vectors(total_words, file_words, file_labels)
+        ft_vecs = get_feature_vectors(total_words, file_words,
+                                      file_labels, opt.multiclass)
         with open(output_file, 'w') as output:
             output.write(ft_vecs)
 
