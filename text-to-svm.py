@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from __future__ import unicode_literals
 import argparse
 import re
@@ -85,6 +86,8 @@ def parse_and_tokenize(line):
 
 def get_feature_vectors(total_words, data_words, data_labels):
     ft_vecs = []
+    get_items = lambda d: (d.iteritems() if sys.version_info < (3,) else
+                           d.items())
     for i, word_dict in enumerate(data_words):
         if not data_labels or (data_labels[i] == '1'):
             ft_vecs.append('1')
@@ -92,7 +95,7 @@ def get_feature_vectors(total_words, data_words, data_labels):
             ft_vecs.append('-1')  # Just in case file uses '0' for neg
 
         ft_ids = []
-        for word, count in word_dict.iteritems():
+        for word, count in get_items(word_dict):
             ft_id = total_words[word]
             ft_ids.append((ft_id, (' %s:%s' % (ft_id, count))))
         ft_ids = sorted(ft_ids, key=itemgetter(0))  # Must be in order
@@ -104,6 +107,13 @@ def get_feature_vectors(total_words, data_words, data_labels):
 
 
 def main():
+    # Create cross-version functions, and starter vars
+    is_python2 = sys.version_info < (3,)
+    get_next = lambda i: i.next() if is_python2 else next(i)
+    get_keys = lambda d: d.iterkeys() if is_python2 else d.keys()
+    open_r_file = lambda f: (open(f, 'r') if is_python2 else
+                             open(f, 'r', errors="replace"))
+
     opt, parser = parse_args()
     ft_id = 1
     total_words = {}
@@ -131,10 +141,10 @@ def main():
         if not output_file:
             output_file = default_output_filename[file_tup]
 
-        with open(file_tup[0], 'r') as text:
+        with open_r_file(file_tup[0]) as text:
             test_flag = False
             lines = iter(text)
-            num_categories = lines.next().count(',')
+            num_categories = get_next(lines).count(',')
             if category_num > num_categories:
                 parser.error("CATEGORY_NUM is greater than the number of "
                              "categories found at the top of the file.")
@@ -143,7 +153,7 @@ def main():
 
             # If test_set, extract 1st example to see if it is labelled
             if is_test:
-                first_example = parse_and_tokenize(lines.next())
+                first_example = parse_and_tokenize(get_next(lines))
                 file_words = [Counter(first_example[last_category_slot:])]
                 if first_example[label_slot] == '?':
                     label = None
@@ -152,15 +162,16 @@ def main():
 
             # Get the label, and count of each word in the example
             for line in lines:
-                line = unicode(line, errors='replace')
+                if is_python2:
+                    line = unicode(line, errors='replace')
                 line = parse_and_tokenize(line)
                 file_words.append(Counter(line[last_category_slot:]))
                 if not is_test or file_labels:
                     file_labels.append(line[label_slot])
 
         # The order the word is seen in the dicts will be the ft id
-        for lst in file_words:
-            for word in lst.iterkeys():
+        for dictionary in file_words:
+            for word in get_keys(dictionary):
                 if word not in total_words:  # To keep ft_ids continuous
                     total_words[word] = ft_id
                     ft_id += 1
