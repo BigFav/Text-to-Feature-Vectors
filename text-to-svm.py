@@ -254,6 +254,11 @@ def main():
                                                      category_num,
                                                      num_categories)
 
+                if opt.stopwords:
+                    line = [word for word in line if word not in opt.stopwords]
+                if stem_or_lemma:
+                    line = [stem_or_lemma(word) for word in line]
+
                 file_words = [Counter(first_ex)]
                 if label != '?':
                     file_labels = [label]
