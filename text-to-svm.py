@@ -6,20 +6,11 @@ import sys
 from collections import Counter
 from operator import itemgetter
 
-try:
-    import nltk
-except ImportError:
-    from string import punctuation
-    has_nltk = False
-    commas = re.compile(r"(,\s)")
-    contractions = re.compile("(?<=[a-zI])('[a-z][a-z]?)\s")
-    punctuation = (punctuation.replace("?", "").replace("'", "").
-                               replace("!", "").replace(".", "").
-                               replace(",", ""))
-else:
-    has_nltk = True
 
-
+"""
+Description:    Converts text files into SVM readable form.
+Author:         Favian Contreras <fnc4@cornell.edu>
+"""
 # General cross-version compatibility funs, and regexes
 eplisis = re.compile("\.\.+")
 interrobang = re.compile("(\!+\?|\?+\!)[?!]*")
@@ -31,6 +22,33 @@ get_keys = lambda d: d.iterkeys() if is_python2 else d.keys()
 get_items = lambda d: d.iteritems() if is_python2 else d.items()
 open_r_file = lambda f: (open(f, 'r') if is_python2 else
                          open(f, 'r', errors="replace"))
+"""
+Regexes from NLTK's TreebankWordTokenizer. The method word_tokenizer was
+extremely slow, so I decided to extract it, and it performed MUCH better.
+
+Author: Edward Loper <edloper@gradient.cis.upenn.edu>
+See more here: https://code.google.com/p/nltk/source/browse/trunk/nltk/nltk/
+                       tokenize/treebank.py
+"""
+contraction2_a = re.compile(r"(?i)(.)('ll|'re|'ve|n't|'s|'m|'d)\b")
+contraction2_b = re.compile(r"(?i)\b(can)(not)\b")
+contraction2_c = re.compile(r"(?i)\b(D)('ye)\b")
+contraction2_d = re.compile(r"(?i)\b(Gim)(me)\b")
+contraction2_e = re.compile(r"(?i)\b(Gon)(na)\b")
+contraction2_f = re.compile(r"(?i)\b(Got)(ta)\b")
+contraction2_g = re.compile(r"(?i)\b(Lem)(me)\b")
+contraction2_h = re.compile(r"(?i)\b(Mor)('n)\b")
+contraction2_i = re.compile(r"(?i)\b(T)(is)\b")
+contraction2_j = re.compile(r"(?i)\b(T)(was)\b")
+contraction2_k = re.compile(r"(?i)\b(Wan)(na)\b")
+contraction3_a = re.compile(r"(?i)\b(Whad)(dd)(ya)\b")
+contraction3_b = re.compile(r"(?i)\b(Wha)(t)(cha)\b")
+separate_punct = re.compile(r"([^\w\'\-\/,&])")
+seperate_commas = re.compile(r"(,\s)")
+single_quotes = re.compile(r"('\s)")
+"""
+End of NLTK's regexes.
+"""
 
 
 def argument_checker():
@@ -133,28 +151,39 @@ def parse_and_tokenize(line, category_num, num_categories):
         begin_comma = end_comma
         end_comma = line.find(',', end_comma+1)
         if end_comma == -1:
-            self.error_handler(5)
+            sys.exit("Error: More categories are defined than are present.")
     last_comma = end_comma
     for _ in range(num_categories-category_num):
         last_comma = line.find(',', last_comma+1)
         if last_comma == -1:
-            self.error_handler(5)
+            sys.exit("Error: More categories are defined than are present.")
     label = line[begin_comma+1:end_comma].strip()
     line = line[last_comma+1:]
 
     line = line.replace("\uFFFD", " \uFFFD ")
-    line = line.replace(":)", " \u1F601 ")
+    line = line.replace(":(", " \u2639 ")
+    line = line.replace(":-(", " \u2639 ")
+    line = line.replace(":)", " \u263A ")
+    line = line.replace(":-)", " \u263A ")
     line = eplisis.sub(" \u2026 ", line)
-    line = line.replace(".", " . ")
     line = interrobang.sub(" \u203D ", line)
 
-    if has_nltk:
-        return nltk.word_tokenize(line), label  # surprisingly, the bottleneck by far
-
-    for ch in punctuation:
-        line = line.replace(ch, ' ' + ch + ' ')
-    line = commas.sub(r" \1", line)
-    return contractions.sub(r" \1 ", line).split(), label
+    line = contraction2_a.sub(r"\1 \2", line)
+    line = contraction2_b.sub(r"\1 \2", line)
+    line = contraction2_c.sub(r"\1 \2", line)
+    line = contraction2_d.sub(r"\1 \2", line)
+    line = contraction2_e.sub(r"\1 \2", line)
+    line = contraction2_f.sub(r"\1 \2", line)
+    line = contraction2_g.sub(r"\1 \2", line)
+    line = contraction2_h.sub(r"\1 \2", line)
+    line = contraction2_i.sub(r"\1 \2", line)
+    line = contraction2_j.sub(r"\1 \2", line)
+    line = contraction2_k.sub(r"\1 \2", line)
+    line = contraction3_a.sub(r"\1 \2 \3", line)
+    line = contraction3_b.sub(r"\1 \2 \3", line)
+    line = separate_punct.sub(r" \1 ", line)
+    line = seperate_commas.sub(r" \1", line)
+    return single_quotes.sub(r" \1", line).split(), label
 
 
 def get_feature_vectors(total_words, data_words, data_labels, multi):
