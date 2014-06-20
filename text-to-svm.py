@@ -46,9 +46,6 @@ contraction3_b = re.compile(r"(?i)\b(Wha)(t)(cha)\b")
 separate_punct = re.compile(r"([^\w\'\-\/,&])")
 seperate_commas = re.compile(r"(,\s)")
 single_quotes = re.compile(r"('\s)")
-"""
-End of NLTK's regexes.
-"""
 
 
 def argument_checker():
@@ -136,7 +133,7 @@ def parse_args():
         from nltk.stem import SnowballStemmer
         opts.stem = SnowballStemmer(opts.lang).stem
     elif opts.lemmatize:
-        if opts.language != "english":
+        if opts.lang != "english":
             parser.error("argument -lang: invalid str value: WordNet "
                          "lemmatizer only works for the English langauge.")
         from nltk.stem.wordnet import WordNetLemmatizer

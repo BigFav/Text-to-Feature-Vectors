@@ -33,8 +33,8 @@ will provide a brief help message.
 ## NLTK Tools
 
 This program uses NLTK's tools to remove stopwords, stem, and lemmatize. These
-tools work across languages as well (with the exception of the lemmatizer,
-which only works for English).
+tools work across languages as well which can be input via the ``-lang`` option
+(with the exception of the lemmatizer, which only works for English).
 
 To see more:
 * Stopwords - <a href="http://www.nltk.org/book/ch02.html">http://www.nltk.org/book/ch02.html</a>
