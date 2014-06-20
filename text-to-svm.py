@@ -5,17 +5,32 @@ import re
 import sys
 from collections import Counter
 from operator import itemgetter
-from string import punctuation
+
+try:
+    import nltk
+except ImportError:
+    from string import punctuation
+    has_nltk = False
+    commas = re.compile(r"(,\s)")
+    contractions = re.compile("(?<=[a-zI])('[a-z][a-z]?)\s")
+    punctuation = (punctuation.replace("?", "").replace("'", "").
+                               replace("!", "").replace(".", "").
+                               replace(",", ""))
+else:
+    has_nltk = True
 
 
+# General cross-version compatibility funs, and regexes
 eplisis = re.compile("\.\.+")
-multi_exc = re.compile("\!\!+")
-multi_quest = re.compile("\?\?+")
 interrobang = re.compile("(\!+\?|\?+\!)[?!]*")
-single_exc_quest = re.compile("(?<![?!\s])([?!])")
-contractions = re.compile("(?<=[a-zI])('[a-z][a-z]?)\s")
-punctuation = (punctuation.replace("?", "").replace("'", "").
-                           replace("!", "").replace(".", ""))
+is_python2 = sys.version_info < (3,)
+if is_python2:
+    range = xrange
+get_next = lambda i: i.next() if is_python2 else next(i)
+get_keys = lambda d: d.iterkeys() if is_python2 else d.keys()
+get_items = lambda d: d.iteritems() if is_python2 else d.items()
+open_r_file = lambda f: (open(f, 'r') if is_python2 else
+                         open(f, 'r', errors="replace"))
 
 
 def argument_checker():
@@ -27,8 +42,8 @@ def argument_checker():
 
             import os.path
             if not os.path.isfile(values[0]):
-                parser.error("argument -%s: [Errno 2] No such file or "
-                             "directory: '%s'" % (self.dest, values[0]))
+                parser.error("argument -%s: [Errno 2] No such file: '%s'" %
+                             (self.dest, values[0]))
 
             has_output_file = False
             if len(values) > 1:
@@ -45,53 +60,109 @@ def argument_checker():
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("-h", "--help", "-?", action='store_true')
-    parser.add_argument("-m", "-multi", "--multiclass", action='store_true')
+    parser = argparse.ArgumentParser(add_help=False,
+                                     epilog=("CATEGORY_NUM refers to one of "
+                                             "the potentially multiple "
+                                             "classification categories that "
+                                             "a line of text may have (e.g. "
+                                             "is spam, is male, etc.). It is "
+                                             "1 by default. The default "
+                                             "output_file is svm_train.train "
+                                             "for a given train_set, the "
+                                             "others follow this pattern."))
+    parser.add_argument("-h", "-?", "--help", action="store_true",
+                        help="Show this help message and exit.")
+    parser.add_argument("-m", "--multi", action="store_true",
+                        help="Creates multi-class featrue vectors.")
+    parser.add_argument("-lang", default="english", action="store",
+                        metavar="LANGUAGE", help=("Language of text (English "
+                                                  "by default)."))
+    parser.add_argument("-stop", "--stopwords", action="store_true",
+                        help="Remove stopwords (uses NLTK's stopwords).")
+
+    reduce_forms = parser.add_mutually_exclusive_group()
+    reduce_forms.add_argument("-stem", action="store_true",
+                              help="Stem words using NLTK's SnowballStemmer.")
+    reduce_forms.add_argument("-lemma", "--lemmatize", action="store_true",
+                              help=("Lemmatize words using NLTK's WordNet "
+                                    "lemmatizer (only for English)."))
     parser.add_argument("-train_set", nargs='+', action=argument_checker())
     parser.add_argument("-val_set", nargs='+', action=argument_checker())
     parser.add_argument("-test_set", nargs='+', action=argument_checker())
-    parser.usage = ("text-to-svm.py [-h] [-multi] [-train_set input_file "
-                    "[CATEGORY_NUM] [output_file]]\n\t\t[-val_set input_file "
-                    "[CATEGORY_NUM] [output_file]]\n\t\t[-test_set input_file "
-                    "[CATEGORY_NUM] [output_file]]\n\nCATEGORY_NUM refers to "
-                    "one of the potentially multiple classification "
-                    "categories that a line of text may have (e.g. is spam, "
-                    "is male, etc.). It is 1 by default. The default "
-                    "output_file is svm_train.train for an inputted "
-                    "train_set, the others follow this pattern.")
+
+    parser.usage = ("text-to-svm.py [-h] [-m] [-lang LANGUAGE] [-stop] "
+                    "[-lemma | -stem]\n\t\t      [-train_set input_file "
+                    "[CATEGORY_NUM] [output_file]]\n\t\t      [-val_set "
+                    "input_file [CATEGORY_NUM] [output_file]]\n\t\t      "
+                    "[-test_set input_file [CATEGORY_NUM] [output_file]]")
 
     opts = parser.parse_args()
+    if opts.help:
+        help = parser.format_help().split("\n\n")
+        usage, help, epilog = help
+        help = help.split('\n')
+        help[-3] = "  -train_set input_file [CATEGORY_NUM] [output_file]"
+        help[-2] = "  -val_set input_file [CATEGORY_NUM] [output_file]"
+        help[-1] = "  -test_set input_file [CATEGORY_NUM] [output_file]"
+        help.append('\n')
+        sys.stdout.write(usage + '\n' + '\n'.join(help) + epilog)
+        sys.exit(0)
     if not (opts.train_set or opts.test_set or opts.val_set):
-        if opts.help:
-            parser.print_usage()
-            sys.exit(0)
         parser.error("Must give at least on data set (train, val, or test).")
+
+    opts.lang = opts.lang.lower()
+    if opts.stopwords:
+        from nltk.corpus import stopwords
+        opts.stopwords = frozenset(stopwords.words(opts.lang))
+    if opts.stem:
+        from nltk.stem import SnowballStemmer
+        opts.stem = SnowballStemmer(opts.lang).stem
+    elif opts.lemmatize:
+        if opts.language != "english":
+            parser.error("argument -lang: invalid str value: WordNet "
+                         "lemmatizer only works for the English langauge.")
+        from nltk.stem.wordnet import WordNetLemmatizer
+        opts.lemmatize = WordNetLemmatizer().lemmatize
     return opts, parser
 
 
-def parse_and_tokenize(line):
+def parse_and_tokenize(line, category_num, num_categories):
+    # Find the label, and text portions of the line
+    begin_comma = end_comma = -1
+    for _ in range(category_num):
+        begin_comma = end_comma
+        end_comma = line.find(',', end_comma+1)
+        if end_comma == -1:
+            self.error_handler(5)
+    last_comma = end_comma
+    for _ in range(num_categories-category_num):
+        last_comma = line.find(',', last_comma+1)
+        if last_comma == -1:
+            self.error_handler(5)
+    label = line[begin_comma+1:end_comma].strip()
+    line = line[last_comma+1:]
+
     line = line.replace("\uFFFD", " \uFFFD ")
     line = line.replace(":)", " \u1F601 ")
-    for ch in punctuation:
-        line = line.replace(ch, ' ' + ch + ' ')
     line = eplisis.sub(" \u2026 ", line)
     line = line.replace(".", " . ")
     line = interrobang.sub(" \u203D ", line)
-    line = multi_exc.sub(" !! ", line)
-    line = multi_quest.sub(" ?? ", line)
-    line = single_exc_quest.sub(r" \1 ", line)
-    return contractions.sub(r" \1 ", line).split()
+
+    if has_nltk:
+        return nltk.word_tokenize(line), label  # surprisingly, the bottleneck by far
+
+    for ch in punctuation:
+        line = line.replace(ch, ' ' + ch + ' ')
+    line = commas.sub(r" \1", line)
+    return contractions.sub(r" \1 ", line).split(), label
 
 
-def get_feature_vectors(total_words, data_words, data_labels, multiclass):
+def get_feature_vectors(total_words, data_words, data_labels, multi):
     ft_vecs = []
-    get_items = lambda d: (d.iteritems() if sys.version_info < (3,) else
-                           d.items())
     for i, word_dict in enumerate(data_words):
         if not data_labels or (data_labels[i] == '1'):
             ft_vecs.append('1')
-        elif multiclass:
+        elif multi:
             ft_vecs.append(data_labels[i])
         else:
             ft_vecs.append('-1')  # Just in case file uses '0' for neg
@@ -99,8 +170,9 @@ def get_feature_vectors(total_words, data_words, data_labels, multiclass):
         ft_ids = []
         for word, count in get_items(word_dict):
             ft_id = total_words[word]
-            ft_ids.append((ft_id, (' %s:%s' % (ft_id, count))))
-        ft_ids = sorted(ft_ids, key=itemgetter(0))  # Must be in order
+            ft_ids.append((ft_id, (" %s:%s" % (ft_id, count))))
+        # Must be in-order, no fancy scapegoat trees w/ indirection
+        ft_ids = sorted(ft_ids, key=itemgetter(0))
 
         ft_vecs.extend(tup[1] for tup in ft_ids)
         ft_vecs.append('\n')
@@ -110,12 +182,6 @@ def get_feature_vectors(total_words, data_words, data_labels, multiclass):
 
 def main():
     # Create cross-version functions, and starter vars
-    is_python2 = sys.version_info < (3,)
-    get_next = lambda i: i.next() if is_python2 else next(i)
-    get_keys = lambda d: d.iterkeys() if is_python2 else d.keys()
-    open_r_file = lambda f: (open(f, 'r') if is_python2 else
-                             open(f, 'r', errors="replace"))
-
     opt, parser = parse_args()
     ft_id = 1
     total_words = {}
@@ -124,6 +190,11 @@ def main():
         opt.val_set: "svm_val.val",
         opt.test_set: "svm_test.test"
     }
+    stem_or_lemma = False
+    if opt.lemmatize:
+        stem_or_lemma = opt.lemmatize
+    elif opt.stem:
+        stem_or_lemma = opt.stem
     # Read files, and add counts of the words in the line as ft val
     for file_tup in filter(bool, [opt.train_set, opt.val_set, opt.test_set]):
         file_words = []
@@ -150,26 +221,34 @@ def main():
             if category_num > num_categories:
                 parser.error("CATEGORY_NUM is greater than the number of "
                              "categories found at the top of the file.")
-            last_category_slot = 2 * num_categories
-            label_slot = 2 * (category_num - 1)
 
             # If test_set, extract 1st example to see if it is labelled
             if is_test:
-                first_example = parse_and_tokenize(get_next(lines))
-                file_words = [Counter(first_example[last_category_slot:])]
-                if first_example[label_slot] == '?':
-                    label = None
-                else:
+                first_ex, label = parse_and_tokenize(get_next(lines),
+                                                     category_num,
+                                                     num_categories)
+
+                file_words = [Counter(first_ex)]
+                if label != '?':
                     file_labels = [label]
 
             # Get the label, and count of each word in the example
             for line in lines:
                 if is_python2:
-                    line = unicode(line, errors='replace')
-                line = parse_and_tokenize(line)
-                file_words.append(Counter(line[last_category_slot:]))
+                    line = unicode(line, errors="replace")
+
+                line, label = parse_and_tokenize(line,
+                                                 category_num,
+                                                 num_categories)
+
+                if opt.stopwords:
+                    line = [word for word in line if word not in opt.stopwords]
+                if stem_or_lemma:
+                    line = [stem_or_lemma(word) for word in line]
+
+                file_words.append(Counter(line))
                 if not is_test or file_labels:
-                    file_labels.append(line[label_slot])
+                    file_labels.append(label)
 
         # The order the word is seen in the dicts will be the ft id
         for dictionary in file_words:
@@ -180,9 +259,9 @@ def main():
 
         # Create the ft vecs and file
         ft_vecs = get_feature_vectors(total_words, file_words,
-                                      file_labels, opt.multiclass)
+                                      file_labels, opt.multi)
         with open(output_file, 'w') as output:
             output.write(ft_vecs)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
