@@ -37,6 +37,6 @@ tools work across languages as well (with the exception of the lemmatizer,
 which only works for English).
 
 To see more:
-Stopwords - <a href="http://www.nltk.org/book/ch02.html">http://www.nltk.org/book/ch02.html</a>
-Snowball Stemmer - <a href="http://www.nltk.org/api/nltk.stem.html#module-nltk.stem.snowball">http://www.nltk.org/api/nltk.stem.html#module-nltk.stem.snowball</a>
-WordNet Lemmatizer - <a href="http://www.nltk.org/_modules/nltk/stem/wordnet.html">http://www.nltk.org/_modules/nltk/stem/wordnet.html</a>
+* Stopwords - <a href="http://www.nltk.org/book/ch02.html">http://www.nltk.org/book/ch02.html</a>
+* Snowball Stemmer - <a href="http://www.nltk.org/api/nltk.stem.html#module-nltk.stem.snowball">http://www.nltk.org/api/nltk.stem.html#module-nltk.stem.snowball</a>
+* WordNet Lemmatizer - <a href="http://www.nltk.org/_modules/nltk/stem/wordnet.html">http://www.nltk.org/_modules/nltk/stem/wordnet.html</a>
