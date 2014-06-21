@@ -32,8 +32,9 @@ will provide a brief help message.
 
 ## NLTK Tools
 
-This program uses NLTK's tools to remove stopwords, stem, and lemmatize. These
-tools work across languages as well which can be input via the ``-lang`` option
+While the basic functionality requires no outside software installation, this
+program uses NLTK tools to remove stopwords, stem, and lemmatize. These tools
+work across languages as well which can be input via the ``-lang`` option
 (with the exception of the lemmatizer, which only works for English).
 
 To see more:

@@ -5,7 +5,7 @@ import re
 import sys
 from collections import Counter
 from operator import itemgetter
-
+import timeit
 
 """
 Description:    Converts text files into SVM readable form.
@@ -250,16 +250,24 @@ def main():
 
             # If test_set, extract 1st example to see if it is labelled
             if is_test:
-                first_ex, label = parse_and_tokenize(get_next(lines),
+                fst_ex, label = parse_and_tokenize(get_next(lines),
                                                      category_num,
                                                      num_categories)
 
                 if opt.stopwords:
-                    line = [word for word in line if word not in opt.stopwords]
+                    fst_ex = [word for word in fst_ex if word.lower() not in
+                                                                 opt.stopwords]
                 if stem_or_lemma:
-                    line = [stem_or_lemma(word) for word in line]
+                    for i, word in enumerate(fst_ex):
+                        lemmatized = stem_or_lemma(word.lower())
+                        if word.istitle():
+                            fst_ex[i] = lemmatized.capitalize()
+                        elif word == word.upper():
+                            fst_ex[i] = lemmatized.upper()
+                        else:
+                            fst_ex[i] = lemmatized
 
-                file_words = [Counter(first_ex)]
+                file_words = [Counter(fst_ex)]
                 if label != '?':
                     file_labels = [label]
 
@@ -273,9 +281,17 @@ def main():
                                                  num_categories)
 
                 if opt.stopwords:
-                    line = [word for word in line if word not in opt.stopwords]
+                    line = [word for word in line if word.lower() not in
+                                                                 opt.stopwords]
                 if stem_or_lemma:
-                    line = [stem_or_lemma(word) for word in line]
+                    for i, word in enumerate(line):
+                        lemmatized = stem_or_lemma(word.lower())
+                        if word.istitle():
+                            line[i] = lemmatized.capitalize()
+                        elif word == word.upper():
+                            line[i] = lemmatized.upper()
+                        else:
+                            line[i] = lemmatized
 
                 file_words.append(Counter(line))
                 if not is_test or file_labels:
