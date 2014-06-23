@@ -6,6 +6,7 @@ import sys
 from collections import Counter
 from operator import itemgetter
 
+
 """
 Description:    Converts text files into SVM readable form.
 Author:         Favian Contreras <fnc4@cornell.edu>
