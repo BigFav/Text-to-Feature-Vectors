@@ -250,7 +250,11 @@ def main():
 
             # If test_set, extract 1st example to see if it is labelled
             if is_test:
-                fst_ex, label = parse_and_tokenize(get_next(lines),
+                fst_ex = get_next(lines)
+                if is_python2:
+                    fst_ex = unicode(fst_ex, errors="replace")
+
+                fst_ex, label = parse_and_tokenize(fst_ex,
                                                    category_num,
                                                    num_categories)
 
