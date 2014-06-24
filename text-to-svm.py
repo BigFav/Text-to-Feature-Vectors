@@ -244,7 +244,6 @@ def get_feature_vectors(total_words, data_words, data_labels, multi):
 def main():
     # Create cross-version functions, and starter vars
     opt, parser = parse_args()
-    stem = 0.0
     ft_id = 1
     total_words = {}
     default_output_filename = {
