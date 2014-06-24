@@ -23,12 +23,16 @@ however it can convert for multi-class data sets as well by using the
 The usage for this program is:
 
     text-to-svm.py [-h] [-m] [-lang LANGUAGE] [-stop] [-lemma | -stem]
-                   [-train_set input_file [CATEGORY_NUM] [output_file]]
+                   -train_set input_file [CATEGORY_NUM] [output_file]
                    [-val_set input_file [CATEGORY_NUM] [output_file]]
-                   [-test_set input_file [CATEGORY_NUM] [output_file]]
+                   -test_set input_file [CATEGORY_NUM] [output_file]
 
 Running the program with any of the help options (``-?``, ``-h``, ``--help``)
 will provide a brief help message.
+
+An example run is:
+
+    ./text-to-svm.py -stop -lemma -train_set train.train output.train -test_set test.test
 
 ## NLTK Tools
 

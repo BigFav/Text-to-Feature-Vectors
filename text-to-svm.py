@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import argparse
 import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from operator import itemgetter
 
 
@@ -50,6 +50,12 @@ contraction3_b = re.compile(r"(?i)\b(Wha)(t)(cha)\b")
 separate_punct = re.compile(r"([^\w\'\-\/,&?!])")
 seperate_commas = re.compile(r"(,\s)")
 single_quotes = re.compile(r"('\s)")
+
+
+class keydefaultdict(defaultdict):
+    def __missing__(self, key):
+        ret = self[key] = self.default_factory(key)
+        return ret
 
 
 def argument_checker():
@@ -110,10 +116,10 @@ def parse_args():
     parser.add_argument("-test_set", nargs='+', action=argument_checker())
 
     parser.usage = ("text-to-svm.py [-h] [-m] [-lang LANGUAGE] [-stop] "
-                    "[-lemma | -stem]\n\t\t      [-train_set input_file "
-                    "[CATEGORY_NUM] [output_file]]\n\t\t      [-val_set "
+                    "[-lemma | -stem]\n\t\t      -train_set input_file "
+                    "[CATEGORY_NUM] [output_file]\n\t\t      [-val_set "
                     "input_file [CATEGORY_NUM] [output_file]]\n\t\t      "
-                    "[-test_set input_file [CATEGORY_NUM] [output_file]]")
+                    "-test_set input_file [CATEGORY_NUM] [output_file]")
 
     opts = parser.parse_args()
     if opts.help:
@@ -126,8 +132,9 @@ def parse_args():
         help.append('\n')
         sys.stdout.write(usage + '\n' + '\n'.join(help) + epilog)
         sys.exit(0)
-    if not (opts.train_set or opts.test_set or opts.val_set):
-        parser.error("Must give at least on data set (train, val, or test).")
+    if not (opts.train_set and opts.test_set):
+        parser.error("Must give at least a train set and test set (should "
+                     "give the validation set, if one is available).")
 
     opts.lang = opts.lang.lower()
     if opts.stopwords:
@@ -200,12 +207,7 @@ def parse_and_tokenize(line, category_num, num_categories,
     if stem_or_lemma:
         for i, word in enumerate(line):
             if word[0].isalpha() or word[-1].isalpha():  # Minimize exp calls
-                lower = word.lower()
-                if lower in lem_stem_memo:  # Check if seen already
-                    lemmatized = lem_stem_memo[lower]
-                else:
-                    lemmatized = lem_stem_memo[lower] = stem_or_lemma(lower)
-
+                lemmatized = lem_stem_memo[word.lower()]  # Memoized stem/lemma
                 if word.istitle():
                     line[i] = lemmatized.capitalize()
                 elif word == word.upper():
@@ -242,6 +244,7 @@ def get_feature_vectors(total_words, data_words, data_labels, multi):
 def main():
     # Create cross-version functions, and starter vars
     opt, parser = parse_args()
+    stem = 0.0
     ft_id = 1
     total_words = {}
     default_output_filename = {
@@ -249,12 +252,12 @@ def main():
         opt.val_set: "svm_val.val",
         opt.test_set: "svm_test.test"
     }
-    lem_stem_memo = {}
     stem_or_lemma = False
     if opt.lemmatize:
         stem_or_lemma = opt.lemmatize
     elif opt.stem:
         stem_or_lemma = opt.stem
+    lem_stem_memo = keydefaultdict(stem_or_lemma)
     # Read files, and add counts of the words in the line as ft val
     for file_tup in filter(bool, [opt.train_set, opt.val_set, opt.test_set]):
         file_words = []
