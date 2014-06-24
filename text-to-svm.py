@@ -13,7 +13,11 @@ Author:         Favian Contreras <fnc4@cornell.edu>
 """
 # General cross-version compatibility funs, and regexes
 eplisis = re.compile("\.\.+")
+multiple_exc = re.compile("\!\!+")
+multiple_ques = re.compile("\?\?+")
 interrobang = re.compile("(\!+\?|\?+\!)[?!]*")
+single_ques_or_exc = re.compile("(?<![?!\s])([?!])")
+
 is_python2 = sys.version_info < (3,)
 if is_python2:
     range = xrange
@@ -26,9 +30,9 @@ open_r_file = lambda f: (open(f, 'r') if is_python2 else
 Regexes from NLTK's TreebankWordTokenizer. The method word_tokenizer was
 extremely slow, so I decided to extract it, and it performed MUCH better.
 
-Author: Edward Loper <edloper@gradient.cis.upenn.edu>
-See more here: https://code.google.com/p/nltk/source/browse/trunk/nltk/nltk/
-                       tokenize/treebank.py
+Author:         Edward Loper <edloper@gradient.cis.upenn.edu>
+See more here:  https://code.google.com/p/nltk/source/browse/trunk/nltk/nltk/
+                        tokenize/treebank.py
 """
 contraction2_a = re.compile(r"(?i)(.)('ll|'re|'ve|n't|'s|'m|'d)\b")
 contraction2_b = re.compile(r"(?i)\b(can)(not)\b")
@@ -43,7 +47,7 @@ contraction2_j = re.compile(r"(?i)\b(T)(was)\b")
 contraction2_k = re.compile(r"(?i)\b(Wan)(na)\b")
 contraction3_a = re.compile(r"(?i)\b(Whad)(dd)(ya)\b")
 contraction3_b = re.compile(r"(?i)\b(Wha)(t)(cha)\b")
-separate_punct = re.compile(r"([^\w\'\-\/,&])")
+separate_punct = re.compile(r"([^\w\'\-\/,&?!])")
 seperate_commas = re.compile(r"(,\s)")
 single_quotes = re.compile(r"('\s)")
 
@@ -141,7 +145,11 @@ def parse_args():
     return opts, parser
 
 
-def parse_and_tokenize(line, category_num, num_categories):
+def parse_and_tokenize(line, category_num, num_categories,
+                       stopwords, stem_or_lemma, lem_stem_memo):
+    if is_python2:
+        line = unicode(line, errors="replace")
+
     # Find the label, and text portions of the line
     begin_comma = end_comma = -1
     for _ in range(category_num):
@@ -157,13 +165,16 @@ def parse_and_tokenize(line, category_num, num_categories):
     label = line[begin_comma+1:end_comma].strip()
     line = line[last_comma+1:]
 
-    line = line.replace("\uFFFD", " \uFFFD ")
     line = line.replace(":(", " \u2639 ")
     line = line.replace(":-(", " \u2639 ")
     line = line.replace(":)", " \u263A ")
     line = line.replace(":-)", " \u263A ")
     line = eplisis.sub(" \u2026 ", line)
     line = interrobang.sub(" \u203D ", line)
+    line = multiple_exc.sub(" !! ", line)
+    line = multiple_ques.sub(" ?? ", line)
+    line = line.replace("\uFFFD", " \uFFFD ")
+    line = single_ques_or_exc.sub(r" \1 ", line)
 
     line = contraction2_a.sub(r"\1 \2", line)
     line = contraction2_b.sub(r"\1 \2", line)
@@ -180,7 +191,29 @@ def parse_and_tokenize(line, category_num, num_categories):
     line = contraction3_b.sub(r"\1 \2 \3", line)
     line = separate_punct.sub(r" \1 ", line)
     line = seperate_commas.sub(r" \1", line)
-    return single_quotes.sub(r" \1", line).split(), label
+    line = single_quotes.sub(r" \1", line).split()
+
+    # Remove stopwords, or stem/lemmatize
+    if stopwords:
+        fst_ex = [word for word in line if word.lower() not in stopwords]
+
+    if stem_or_lemma:
+        for i, word in enumerate(line):
+            if word[0].isalpha() or word[-1].isalpha():  # Minimize exp calls
+                lower = word.lower()
+                if lower in lem_stem_memo:  # Check if seen already
+                    lemmatized = lem_stem_memo[lower]
+                else:
+                    lemmatized = lem_stem_memo[lower] = stem_or_lemma(lower)
+
+                if word.istitle():
+                    line[i] = lemmatized.capitalize()
+                elif word == word.upper():
+                    line[i] = lemmatized.upper()
+                else:
+                    line[i] = lemmatized
+
+    return line, label
 
 
 def get_feature_vectors(total_words, data_words, data_labels, multi):
@@ -216,6 +249,7 @@ def main():
         opt.val_set: "svm_val.val",
         opt.test_set: "svm_test.test"
     }
+    lem_stem_memo = {}
     stem_or_lemma = False
     if opt.lemmatize:
         stem_or_lemma = opt.lemmatize
@@ -245,60 +279,29 @@ def main():
             lines = iter(text)
             num_categories = get_next(lines).count(',')
             if category_num > num_categories:
-                parser.error("CATEGORY_NUM is greater than the number of "
+                parser.error("CATEGORY_NUM is greater than the inumber of "
                              "categories found at the top of the file.")
 
             # If test_set, extract 1st example to see if it is labelled
             if is_test:
-                fst_ex = get_next(lines)
-                if is_python2:
-                    fst_ex = unicode(fst_ex, errors="replace")
-
-                fst_ex, label = parse_and_tokenize(fst_ex,
+                fst_ex, label = parse_and_tokenize(get_next(lines),
                                                    category_num,
-                                                   num_categories)
-
-                if opt.stopwords:
-                    fst_ex = [word for word in fst_ex if word.lower() not in
-                                                                 opt.stopwords]
-                if stem_or_lemma:
-                    for i, word in enumerate(fst_ex):
-                        if word[0].isalpha() or word[-1].isalpha():
-                            lemmatized = stem_or_lemma(word.lower())
-                            if word.istitle():
-                                fst_ex[i] = lemmatized.capitalize()
-                            elif word == word.upper():
-                                fst_ex[i] = lemmatized.upper()
-                            else:
-                                fst_ex[i] = lemmatized
-
+                                                   num_categories,
+                                                   opt.stopwords,
+                                                   stem_or_lemma,
+                                                   lem_stem_memo)
                 file_words = [Counter(fst_ex)]
                 if label != '?':
                     file_labels = [label]
 
             # Get the label, and count of each word in the example
             for line in lines:
-                if is_python2:
-                    line = unicode(line, errors="replace")
-
                 line, label = parse_and_tokenize(line,
                                                  category_num,
-                                                 num_categories)
-
-                if opt.stopwords:
-                    line = [word for word in line if word.lower() not in
-                                                                 opt.stopwords]
-                if stem_or_lemma:
-                    for i, word in enumerate(line):
-                        if word[0].isalpha() or word[-1].isalpha():
-                            lemmatized = stem_or_lemma(word.lower())
-                            if word.istitle():
-                                line[i] = lemmatized.capitalize()
-                            elif word == word.upper():
-                                line[i] = lemmatized.upper()
-                            else:
-                                line[i] = lemmatized
-
+                                                 num_categories,
+                                                 opt.stopwords,
+                                                 stem_or_lemma,
+                                                 lem_stem_memo)
                 file_words.append(Counter(line))
                 if not is_test or file_labels:
                     file_labels.append(label)
