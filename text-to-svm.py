@@ -252,7 +252,7 @@ def main():
         opt.val_set: "svm_val.val",
         opt.test_set: "svm_test.test"
     }
-    stem_or_lemma = False
+    stem_or_lemma = None
     if opt.lemmatize:
         stem_or_lemma = opt.lemmatize
     elif opt.stem:
