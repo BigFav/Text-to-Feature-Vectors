@@ -1,14 +1,17 @@
-# Text-to-SVM
+# Feature-Vectorize-Text
 
-Want to use SVM to classify your text? Convert your text sets into SVM readable
-files. Given a file in the form:
+Want to use SVM to classify your text? Want kNN? Convert your text sets into
+feature vectors, so that you can use machine learning algorithms to classify.
+Given a file in the form:
 
     isSpam, positive ,text
-    1,0,Ugh, blah blah blah.....
+    1,0,Ugh, blah blah blah
 
-This program will output a series of feature vectors for a given category. I
-recommend using <a href="http://svmlight.joachims.org/">SVM-Light</a> for
-binary classification, and
+This program will output a series of feature vectors for a given category,
+where the order of occurence of the word is the feature id, and the frequency
+of the word in the example is the value. For SVM, I recommend using
+<a href="http://svmlight.joachims.org/">SVM-Light</a>
+for binary classification, and
 <a href="http://www.cs.cornell.edu/people/tj/svm_light/svm_multiclass.html">SVM-Multiclass</a>
 for multi-class classifications with the files this program outputs.
 

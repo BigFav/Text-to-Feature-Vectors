@@ -8,7 +8,7 @@ from operator import itemgetter
 
 
 """
-Description:    Converts text files into SVM readable form.
+Description:    Converts text files into feature vectors.
 Author:         Favian Contreras <fnc4@cornell.edu>
 """
 # General cross-version compatibility funs, and regexes
