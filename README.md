@@ -9,11 +9,8 @@ Given a file in the form:
 
 This program will output a series of feature vectors for a given category,
 where the order of occurence of the word is the feature id, and the frequency
-of the word in the example is the value. For SVM, I recommend using
-<a href="http://svmlight.joachims.org/">SVM-Light</a>
-for binary classification, and
-<a href="http://www.cs.cornell.edu/people/tj/svm_light/svm_multiclass.html">SVM-Multiclass</a>
-for multi-class classifications with the files this program outputs.
+of the word in the example is the value. The ``-p`` option allows using word
+pair occurences and frequencies instead of individual words.
 
 The term category is used to describe the different classification jobs (e.g.
 is spam, is positive, etc.); ``CATEGORY_NUM`` for spam is 1 in the example
@@ -25,7 +22,7 @@ however it can convert for multi-class data sets as well by using the
 
 The usage for this program is:
 
-    text-to-svm.py [-h] [-m] [-lang LANGUAGE] [-stop] [-lemma | -stem]
+    text-to-svm.py [-h] [-p] [-m] [-lang LANGUAGE] [-stop] [-lemma | -stem]
                    -train_set input_file [CATEGORY_NUM] [output_file]
                    [-val_set input_file [CATEGORY_NUM] [output_file]]
                    -test_set input_file [CATEGORY_NUM] [output_file]
