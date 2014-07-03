@@ -156,7 +156,7 @@ def parse_args():
 
 
 def parse_and_tokenize(line, category_num, num_categories,
-                       stopwords, stem_or_lemma, lem_stem_memo):
+                       stopwords, stem_or_lemma, lem_stem_memo, bi):
     if is_python2:
         line = unicode(line, errors="replace")
 
@@ -217,6 +217,14 @@ def parse_and_tokenize(line, category_num, num_categories,
                     line[i] = lemmatized.upper()
                 else:
                     line[i] = lemmatized
+    if bi:
+        word_tups = defaultdict(int)
+        for i in range(len(line) - 1):
+            word_tups[(line[i], line[i+1])] += 1
+        word_tups[(line[len(line)-1], '')] = 1
+        line = word_tups
+    else:
+        line = Counter(line)
 
     return line, label
 
@@ -245,7 +253,6 @@ def get_feature_vectors(total_words, data_words, data_labels, multi):
 
 
 def main():
-    bi = 1
     # Create cross-version functions, and starter vars
     opt, parser = parse_args()
     ft_id = 1
@@ -295,16 +302,9 @@ def main():
                                                    num_categories,
                                                    opt.stopwords,
                                                    stem_or_lemma,
-                                                   lem_stem_memo)
-                if opt.bi:
-                    word_tups = defaultdict(int)
-                    for i in range(len(line) - 1):
-                        word_tups[(line[i], line[i+1])] += 1
-                    word_tups[(line[len(line)-1], '')] = 1
-                    file_words = [word_tups]
-                else:
-                    file_words = [Counter(fst_ex)]
-
+                                                   lem_stem_memo,
+                                                   opt.bi)
+                file_words = [fst_ex]
                 if label != '?':
                     file_labels = [label]
 
@@ -315,16 +315,9 @@ def main():
                                                  num_categories,
                                                  opt.stopwords,
                                                  stem_or_lemma,
-                                                 lem_stem_memo)
-                if opt.bi:
-                    word_tups = defaultdict(int)
-                    for i in range(len(line) - 1):
-                        word_tups[(line[i], line[i+1])] += 1
-                    word_tups[(line[len(line)-1], '')] = 1
-                    file_words.append(word_tups)
-                else:
-                    file_words.append(Counter(line))
-
+                                                 lem_stem_memo,
+                                                 opt.bi)
+                file_words.append(line)
                 if not is_test or file_labels:
                     file_labels.append(label)
 
