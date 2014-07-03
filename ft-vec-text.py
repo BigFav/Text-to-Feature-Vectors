@@ -95,8 +95,11 @@ def parse_args():
                                              "output_file is svm_train.train "
                                              "for a given train_set, the "
                                              "others follow this pattern."))
-    parser.add_argument("-h", "-?", "--help", action="store_true",
+    parser.add_argument("-h", "--help", "-?", action="store_true",
                         help="Show this help message and exit.")
+    parser.add_argument("-bi", action="store_true", help=("Use bigrams for "
+                                                          "feature ids instead"
+                                                          " of single words."))
     parser.add_argument("-m", "--multi", action="store_true",
                         help="Creates multi-class featrue vectors.")
     parser.add_argument("-lang", default="english", action="store",
@@ -115,7 +118,7 @@ def parse_args():
     parser.add_argument("-val_set", nargs='+', action=argument_checker())
     parser.add_argument("-test_set", nargs='+', action=argument_checker())
 
-    parser.usage = ("text-to-svm.py [-h] [-m] [-lang LANGUAGE] [-stop] "
+    parser.usage = ("text-to-svm.py [-h] [-bi] [-m] [-lang LANGUAGE] [-stop] "
                     "[-lemma | -stem]\n\t\t      -train_set input_file "
                     "[CATEGORY_NUM] [output_file]\n\t\t      [-val_set "
                     "input_file [CATEGORY_NUM] [output_file]]\n\t\t      "
@@ -242,6 +245,7 @@ def get_feature_vectors(total_words, data_words, data_labels, multi):
 
 
 def main():
+    bi = 1
     # Create cross-version functions, and starter vars
     opt, parser = parse_args()
     ft_id = 1
@@ -292,7 +296,15 @@ def main():
                                                    opt.stopwords,
                                                    stem_or_lemma,
                                                    lem_stem_memo)
-                file_words = [Counter(fst_ex)]
+                if opt.bi:
+                    word_tups = defaultdict(int)
+                    for i in range(len(line) - 1):
+                        word_tups[(line[i], line[i+1])] += 1
+                    word_tups[(line[len(line)-1], '')] = 1
+                    file_words = [word_tups]
+                else:
+                    file_words = [Counter(fst_ex)]
+
                 if label != '?':
                     file_labels = [label]
 
@@ -304,7 +316,15 @@ def main():
                                                  opt.stopwords,
                                                  stem_or_lemma,
                                                  lem_stem_memo)
-                file_words.append(Counter(line))
+                if opt.bi:
+                    word_tups = defaultdict(int)
+                    for i in range(len(line) - 1):
+                        word_tups[(line[i], line[i+1])] += 1
+                    word_tups[(line[len(line)-1], '')] = 1
+                    file_words.append(word_tups)
+                else:
+                    file_words.append(Counter(line))
+
                 if not is_test or file_labels:
                     file_labels.append(label)
 
